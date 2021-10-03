@@ -48,15 +48,26 @@ Annotations:        kubeadm.alpha.kubernetes.io/cri-socket: /var/run/dockershim.
   - 内核优化（文件描述符大小，内核转发，等等）
 - 安装部署bind9内网DNS系统
 - 安装部署docker的私有仓库-harbor
-- 准备证书签发环境-cfssl
+- 准备证书签发环境-cfssl（很多K8S的新特性都是需要SSL通信的）
+  - cfssl：证书签发的主要工具
+  - cfssl-json：将cfssl生成的证书（json格式）变为文件承载式证书
+  - cfssl-certinfo：验证证书的信息
 - 安装部署主控节点服务（4个）
-  - Etcd
+  - Etcd（可以单独部署在一台机器上，建议部署奇数台机子，这是由于其选举机制决定的）
   - Apiserver
   - Controller-manager
   - Scheduler
 - 安装部署运算节点服务（2个）
   - Kubelet
   - Kebe-proxy
+
+> 主控节点和运算节点只是逻辑上的区分，实际上也可以在同一台机子上。
+>
+> 关于kubeconfig文件：
+>
+> - 这是一个K8S用户的配置文件
+> - 它里面包含证书信息
+> - 证书过期或更换，需要同步替换该文件
 
 ## 3 使用Kubeadmin进行部署（相对简单，熟手推荐）
 

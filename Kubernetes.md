@@ -105,22 +105,17 @@ K8S内提供众多的Pod控制器，
 
 - 标签是k8s特色的管理方式,便于分类管理资源对象。
 - 一个标签可以对应多个资源，-个资源也可以有多个标签,它们是多对多的关系。
-
 - 一个资源拥有多个标签,可以实现不同维度的管理。
 - 标签的组成: key=value(值不能多余64个字节字母数字开头 中间只能是 - _ .）
-
 - 与标签类似的,还有一种“注解” ( annotations )
 
 ##### 2.2.3.2 Label选择器
 
 - 给资源打上标签后,可以使用标签选择器过滤指定的标签
 - 标签选择器目前有两个:基于等值关系(等于、不等于)和基于集合关系(属于、不属于、存在)
-
 - 许多资源支持内嵌标签选择器字段
-
-  matchl _abels
-
-  matchExpressions
+  - match_labels
+  - match Expressions
 
 #### 2.2.4 Service/Ingress
 
@@ -138,4 +133,512 @@ K8S内提供众多的Pod控制器，
 - Ingress则可以调度不同业务域、 不同URL访问路径的业务流量
 
 ## 3 Kubernetes 组件
+
+## 4 Kubernetes 核心资源的管理方法
+
+- 陈述式管理方法 - 主要依赖命令行CLI工具进行管理
+- 声明式管理方法 - 主要依赖统一资源配置清单（manifest）进行管理
+- GUI式管理方法 - 主要依赖图形化操作界面进行管理
+
+### 4.1 陈述式资源管理
+
+- Kubernetes管理集群资源的唯一入口就是通过相应的方法调用apiserver的接口
+- kubectl是官方的CLI命令行工具，用于与apiserver进行通信，将用户在命令行输入的命令，组织并转化为apiserver能识别的信息，进而实现管理K8S各种资源的一种有效途径
+- 陈述式资源管理方法可以满足90%以上的资源管理需求，但它的缺点也很明显
+  - 命令冗长、复杂、难以记忆
+  - 特定场景下，无法实现管理需求
+  - 对资源的增、删、查操作比较容易，改就很痛苦
+
+#### 4.1.1 管理名称空间
+
+##### 4.1.1.1 查看名称空间
+
+```
+➜  kubernetes kubectl get namespace
+NAME                   STATUS   AGE
+default                Active   15h
+kube-node-lease        Active   15h
+kube-public            Active   15h
+kube-system            Active   15h
+kubernetes-dashboard   Active   15h
+```
+
+> 查询资源的时候应该要带上namespace
+
+##### 4.1.1.2 查看default命名空间的所有资源
+
+```
+➜  kubernetes kubectl get all -n default
+NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   15h
+```
+
+> default 默认可以省略，其他的不行
+
+##### 4.1.1.3 创建名称空间
+
+```
+➜  ~ kubectl create ns app
+namespace/app created
+➜  ~ kubectl get ns
+NAME                   STATUS   AGE
+app                    Active   8s
+default                Active   15h
+kube-node-lease        Active   15h
+kube-public            Active   15h
+kube-system            Active   15h
+kubernetes-dashboard   Active   15h
+```
+
+##### 4.1.1.4 删除名称空间
+
+```
+➜  ~ kubectl delete ns app
+namespace "app" deleted
+```
+
+#### 4.1.2 管理deployment资源
+
+##### 4.1.2.1 创建deployment资源
+
+```
+➜  ~ kubectl create deployment nginx-dp --image=nginx:latest -n app-dev
+deployment.apps/nginx-dp created
+```
+
+创建后可以用docker命令查看到相应的container
+
+```
+➜  ~ docker ps
+CONTAINER ID   IMAGE                                COMMAND                  CREATED         STATUS         PORTS     NAMES
+bc1cfcb95778   nginx                                "/docker-entrypoint.…"   2 minutes ago   Up 2 minutes             k8s_nginx_nginx-dp-5849f68b88-pphjb_app-dev_80144e55-d3ae-4ced-b637-0366a41a7800_0
+9632f5dca378   k8s.gcr.io/pause:3.4.1               "/pause"                 3 minutes ago   Up 3 minutes             k8s_POD_nginx-dp-5849f68b88-pphjb_app-dev_80144e55-d3ae-4ced-b637-0366a41a7800_0
+```
+
+##### 4.1.2.2 查看deployment资源
+
+```
+➜  ~ kubectl get deploy -n app-dev
+NAME       READY   UP-TO-DATE   AVAILABLE   AGE
+nginx-dp   1/1     1            1           21s
+```
+
+##### 4.1.2.3 查看deployment资源（详细）
+
+```
+➜  ~ kubectl describe deployment nginx-dp -n app-dev
+Name:                   nginx-dp
+Namespace:              app-dev
+CreationTimestamp:      Sun, 03 Oct 2021 13:39:38 +0800
+Labels:                 app=nginx-dp
+Annotations:            deployment.kubernetes.io/revision: 1
+Selector:               app=nginx-dp
+Replicas:               1 desired | 1 updated | 1 total | 1 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:  app=nginx-dp
+  Containers:
+   nginx:
+    Image:        nginx:latest
+    Port:         <none>
+    Host Port:    <none>
+    Environment:  <none>
+    Mounts:       <none>
+  Volumes:        <none>
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Available      True    MinimumReplicasAvailable
+  Progressing    True    NewReplicaSetAvailable
+OldReplicaSets:  <none>
+NewReplicaSet:   nginx-dp-5849f68b88 (1/1 replicas created)
+Events:
+  Type    Reason             Age    From                   Message
+  ----    ------             ----   ----                   -------
+  Normal  ScalingReplicaSet  6m16s  deployment-controller  Scaled up replica set nginx-dp-5849f68b88 to 1
+```
+
+##### 4.1.2.4 查看pod资源
+
+```
+➜  ~ kubectl get pods -n app-dev
+NAME                        READY   STATUS    RESTARTS   AGE
+nginx-dp-5849f68b88-pphjb   1/1     Running   0          39s
+➜  ~ kubectl get pods -n app-dev -o wide
+NAME                        READY   STATUS    RESTARTS   AGE   IP         NODE             NOMINATED NODE   READINESS GATES
+nginx-dp-5849f68b88-pphjb   1/1     Running   0          45s   10.1.0.8   docker-desktop   <none>           <none>
+```
+
+##### 4.1.2.5 进入pod资源
+
+```
+➜  ~ kubectl exec nginx-dp-5849f68b88-pphjb -it /bin/bash -n app-dev
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+root@nginx-dp-5849f68b88-pphjb:/# exit
+```
+
+新版本的写法如下：
+
+```
+➜  ~ kubectl exec nginx-dp-5849f68b88-pphjb -n app-dev -it -- /bin/bash
+root@nginx-dp-5849f68b88-pphjb:/# hostname
+nginx-dp-5849f68b88-pphjb
+root@nginx-dp-5849f68b88-pphjb:/#
+```
+
+当然也可以通过docker exec进入pod
+
+##### 4.1.2.6 删除pod资源（重启）
+
+可以先watch观察一下pod的状态如下：`watch -n 1 'kubectl describe deployment nginx-dp -n app-dev|grep -C 5 Event'`
+
+```
+Every 1.0s: kubectl describe deployment nginx-dp -n app-dev|grep -C 5 Event                                                                                                      C02DTFJJMD6N: Sun Oct  3 15:32:49 2021
+
+  ----           ------  ------
+  Progressing    True    NewReplicaSetAvailable
+  Available      True    MinimumReplicasAvailable
+OldReplicaSets:  <none>
+NewReplicaSet:   nginx-dp-5849f68b88 (1/1 replicas created)
+Events:
+  Type    Reason             Age   From                   Message
+  ----    ------             ----  ----                   -------
+  Normal  ScalingReplicaSet  113m  deployment-controller  Scaled up replica set nginx-dp-5849f68b88 to 1
+```
+
+然后可以删除，后面可以发现已经重新启动一个新的pod
+
+```
+➜  ~ kubectl delete pod nginx-dp-5849f68b88-pphjb -n app-dev
+pod "nginx-dp-5849f68b88-pphjb" deleted
+➜  ~ kubectl get pods -n app-dev
+NAME                        READY   STATUS    RESTARTS   AGE
+nginx-dp-5849f68b88-c25xt   1/1     Running   0          24s
+```
+
+##### 4.1.2.7 删除deployment
+
+```
+➜  ~ kubectl delete deploy nginx-dp -n app-dev
+deployment.apps "nginx-dp" deleted
+➜  ~ kubectl get pods -n app-dev -o wide
+NAME                        READY   STATUS        RESTARTS   AGE   IP         NODE             NOMINATED NODE   READINESS GATES
+nginx-dp-5849f68b88-c25xt   0/1     Terminating   0          16m   10.1.0.9   docker-desktop   <none>           <none>
+➜  ~ kubectl get pods -n app-dev -o wide
+No resources found in app-dev namespace.
+```
+
+#### 4.1.3 管理Service资源
+
+##### 4.1.3.1 创建service
+
+之前把deployment删除了，先创建起来
+
+```
+➜  ~ kubectl create deployment nginx-dp --image=nginx:latest -n app-dev
+deployment.apps/nginx-dp created
+➜  ~ kubectl get pods -n app-dev -o wide
+NAME                        READY   STATUS              RESTARTS   AGE   IP       NODE             NOMINATED NODE   READINESS GATES
+nginx-dp-5849f68b88-g9grh   0/1     ContainerCreating   0          4s    <none>   docker-desktop   <none>           <none>
+➜  ~ kubectl get pods -n app-dev -o wide
+NAME                        READY   STATUS    RESTARTS   AGE   IP          NODE             NOMINATED NODE   READINESS GATES
+nginx-dp-5849f68b88-g9grh   1/1     Running   0          8s    10.1.0.10   docker-desktop   <none>           <none>
+➜  ~
+```
+
+创建service需要expose命令，默认暴露的service type是ClusterIP，这样是在Mac宿主机无法访问到pod中nginx服务。
+
+```
+➜  ~ kubectl expose deployment nginx-dp --port=80 -n app-dev
+service/nginx-dp exposed
+➜  ~ kubectl get all -n app-dev
+NAME                            READY   STATUS    RESTARTS   AGE
+pod/nginx-dp-5849f68b88-g9grh   1/1     Running   0          2m34s
+
+NAME               TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+service/nginx-dp   ClusterIP   10.109.2.103   <none>        80/TCP    23s
+
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/nginx-dp   1/1     1            1           2m34s
+
+NAME                                  DESIRED   CURRENT   READY   AGE
+replicaset.apps/nginx-dp-5849f68b88   1         1         1       2m34s
+```
+
+如果需要本地Mac宿主机能够访问到k8s pod中的nginx服务，则需要暴露为type=nodeport,结果如下。
+
+`kubectl expose deployment nginx-dp --port=80 --type=NodePort -n app-dev`
+
+```
+➜  ~ kubectl expose deployment nginx-dp --port=80 --type=NodePort -n app-dev
+service/nginx-dp exposed
+➜  ~ kubectl get svc nginx-dp -n app-dev
+NAME       TYPE       CLUSTER-IP    EXTERNAL-IP   PORT(S)        AGE
+nginx-dp   NodePort   10.111.0.11   <none>        80:31807/TCP   5s
+➜  ~ kubectl get svc nginx-dp -n app-dev -o yaml
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: "2021-10-03T08:33:18Z"
+  labels:
+    app: nginx-dp
+  name: nginx-dp
+  namespace: app-dev
+  resourceVersion: "37558"
+  uid: c4f1a961-7750-48aa-bfc2-e8f133798d87
+spec:
+  clusterIP: 10.111.0.11
+  clusterIPs:
+  - 10.111.0.11
+  externalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - nodePort: 31807
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx-dp
+  sessionAffinity: None
+  type: NodePort
+status:
+  loadBalancer:
+    ingress:
+    - hostname: localhost
+➜  ~
+```
+
+由上可知，访问`curl localhost:31807`，可以得到如下结果。
+
+```
+➜  ~ curl localhost:31807
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+```
+
+![Deployment evolution](./images/k8s-nginx-access-by-mac-host.png)
+
+扩展deployment
+
+```
+➜  ~ kubectl scale deployment nginx-dp --replicas=2 -n app-dev
+deployment.apps/nginx-dp scaled
+➜  ~
+```
+
+扩展一个pod后，可以看到以下的信息，
+
+```
+➜  ~ kubectl get all -n app-dev
+NAME                            READY   STATUS    RESTARTS   AGE
+pod/nginx-dp-5849f68b88-g9grh   1/1     Running   0          80m
+pod/nginx-dp-5849f68b88-tk4ll   1/1     Running   0          73m
+
+NAME               TYPE       CLUSTER-IP    EXTERNAL-IP   PORT(S)        AGE
+service/nginx-dp   NodePort   10.111.0.11   <none>        80:31807/TCP   38m
+
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/nginx-dp   2/2     2            2           80m
+
+NAME                                  DESIRED   CURRENT   READY   AGE
+replicaset.apps/nginx-dp-5849f68b88   2         2         2       80m
+```
+
+
+
+##### 4.1.3.2 查看service
+
+再查看一下svc的详细信息
+
+```
+➜  ~ kubectl describe svc nginx-dp -n app-dev
+Name:                     nginx-dp
+Namespace:                app-dev
+Labels:                   app=nginx-dp
+Annotations:              <none>
+Selector:                 app=nginx-dp
+Type:                     NodePort
+IP Family Policy:         SingleStack
+IP Families:              IPv4
+IP:                       10.111.0.11
+IPs:                      10.111.0.11
+LoadBalancer Ingress:     localhost
+Port:                     <unset>  80/TCP
+TargetPort:               80/TCP
+NodePort:                 <unset>  31807/TCP
+Endpoints:                10.1.0.10:80,10.1.0.11:80
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:                   <none>
+```
+
+##### 4.1.3.3 删除service
+
+```
+➜  ~ kubectl delete svc nginx-dp -n app-dev
+service "nginx-dp" deleted
+➜  ~ kubectl get svc nginx-dp -n app-dev
+Error from server (NotFound): services "nginx-dp" not found
+```
+
+### 4.2 声明式资源管理
+
+- 声明式资源管理的方法依赖于资源配置清单（yaml/json）
+- 对资源的管理是通过事先定义在统一资源配置清单内，再通过陈述式应用到k8s集群里
+- 语法格式：kubectl create/apply/delete -f /path/to/yaml
+- 资源配置清单的学习方法：
+  - 多个看官方写的，能读懂
+  - 能照着现成的文件改着用
+  - 遇到不懂的，善用kubectl explain ...
+  - 初学切忌上来就无中生有，自己憋着写
+
+#### 4.2.1 查看资源配置清单
+
+`➜  ~ kubectl get pod nginx-dp-5849f68b88-g9grh -n app-dev -o yaml`
+
+`➜  ~ kubectl get svc nginx-dp -n app-dev -o yaml`
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: "2021-10-03T08:33:18Z"
+  labels:
+    app: nginx-dp
+  name: nginx-dp
+  namespace: app-dev
+  resourceVersion: "37558"
+  uid: c4f1a961-7750-48aa-bfc2-e8f133798d87
+spec:
+  clusterIP: 10.111.0.11
+  clusterIPs:
+  - 10.111.0.11
+  externalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - nodePort: 31807
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx-dp
+  sessionAffinity: None
+  type: NodePort
+status:
+  loadBalancer:
+    ingress:
+    - hostname: localhost
+```
+
+#### 4.2.2 解释资源配置清单
+
+`➜  ~ kubectl explain service.metadata`
+
+可以解释资源配置清单中的某个属性
+
+#### 4.2.3 创建资源配置清单
+
+首先创建一个文件svc-nginx-ds.yaml如下：
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nginx-ds
+  name: nginx-ds
+  namespace: app-dev
+spec:
+  ports:
+  - nodePort: 31907
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx-dp
+  sessionAffinity: None
+  type: NodePort
+```
+
+然后即可执行以下命令创建一个新的service，
+
+```
+➜  ~ kubectl create -f /Users/landyl/Containerization/kubernetes/svc-nginx-ds.yaml
+service/nginx-ds created
+➜  ~ kubectl get svc -n app-dev
+NAME       TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+nginx-dp   NodePort   10.111.0.11     <none>        80:31807/TCP   72m
+nginx-ds   NodePort   10.99.230.128   <none>        80:31907/TCP   57s
+➜  ~
+```
+
+#### 4.2.4 应用资源配置清单
+
+修改资源配置清单的时候可以使用`kubectl apply -f /Users/landyl/Containerization/kubernetes/svc-nginx-ds.yaml`命令。
+
+#### 4.2.5 修改资源配置清单
+
+##### 4.2.5.1 在线修改
+
+`kubectl edit svc nginx-ds -n app-dev`, 假设修改端口后，如下结果，
+
+```
+➜  ~ kubectl edit svc nginx-ds -n app-dev
+service/nginx-ds edited
+➜  ~ kubectl get svc -n app-dev
+NAME       TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+nginx-dp   NodePort   10.111.0.11     <none>        80:31807/TCP   80m
+nginx-ds   NodePort   10.99.230.128   <none>        80:31908/TCP   8m51s
+```
+
+##### 4.2.5.2 离线修改（推荐）
+
+修改yaml文件，本例修改了端口号，然后重新apply即可
+
+```
+➜  ~ kubectl apply -f /Users/landyl/Containerization/kubernetes/svc-nginx-ds.yaml
+Warning: resource services/nginx-ds is missing the kubectl.kubernetes.io/last-applied-configuration annotation which is required by kubectl apply. kubectl apply should only be used on resources created declaratively by either kubectl create --save-config or kubectl apply. The missing annotation will be patched automatically.
+service/nginx-ds configured
+➜  ~ kubectl get svc -n app-dev
+NAME       TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+nginx-dp   NodePort   10.111.0.11     <none>        80:31807/TCP   95m
+nginx-ds   NodePort   10.99.230.128   <none>        80:31909/TCP   23m
+➜  ~
+```
+
+修改应用后，也是可以看到nginx首页内容如下
+
+![Deployment evolution](./images/k8s-nginx-access-by-mac-host-2.png)
+
+#### 4.2.6 删除资源配置清单
+
+- 陈述式删除：`kubectl delete svc nginx-ds` (推荐)
+- 声明式删除：`kubectl delete -f svc-nginx-ds.yaml`
 
