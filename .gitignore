@@ -1,0 +1,7 @@
+**/target/**
+
+# IntelliJ project files
+**/.idea/
+**/out/
+*.iml
+**/log.*/**
