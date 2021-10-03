@@ -38,6 +38,26 @@ Annotations:        kubeadm.alpha.kubernetes.io/cri-socket: /var/run/dockershim.
 
 ## 2 二进制安装部署（生产环境适用，新手推荐）
 
+使用二进制安装部署K8S的要点：
+
+- 基础设置环境准备好
+  - CentOS7.6系统（内核在3.8.x以上）
+  - 关闭SELinux，关闭firewalld服务
+  - 时间同步（chronyd）
+  - 调整Base源，Epel源
+  - 内核优化（文件描述符大小，内核转发，等等）
+- 安装部署bind9内网DNS系统
+- 安装部署docker的私有仓库-harbor
+- 准备证书签发环境-cfssl
+- 安装部署主控节点服务（4个）
+  - Etcd
+  - Apiserver
+  - Controller-manager
+  - Scheduler
+- 安装部署运算节点服务（2个）
+  - Kubelet
+  - Kebe-proxy
+
 ## 3 使用Kubeadmin进行部署（相对简单，熟手推荐）
 
 ## 4 部署Kubernetes Dashboard
