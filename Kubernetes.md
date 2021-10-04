@@ -69,6 +69,30 @@ Containers have become popular because they provide extra benefits, such as:
 - 可以把Pod理解成豌豆荚，而同一个pod内的每个容器是一个个的豌豆
 - 一个Pod里运行多个容器，叫边车模式（Sidecar）
 
+###### 2.2.1.1.1 为什么Pod必须是原子调度单位？
+
+> 1. 进程组概念 Pod = “进程组”
+> 2. 有些容器需要紧密合作 需要在同一个宿主机上  (业务容器 日志转发容器)  **亲密关系**-调度解决
+>
+> **Pod 里面的容器是“超亲密关系”**
+>
+> **超亲密关系**-pod解决
+>
+> - 比如说两个进程之间会发生文件交换，一个写日志，一个读日志；
+> - 两个进程之间需要通过 localhost 或者说是本地的 Socket 去进行通信，这种本地通信也是超亲密关系；
+> - 这两个容器或者是微服务之间，需要发生非常频繁的 RPC 调用，出于性能的考虑，也希望它们是超亲密关系；
+> - 两个容器或者是应用，它们需要共享某些 Linux Namespace。最简单常见的一个例子，就是我有一个容器需要加入另一个容器的 Network Namespace。这样我就能看到另一个容器的网络设备，和它的网络信息。
+
+###### 2.2.1.1.2 Pod要解决的问题
+
+- 共享网络
+
+> 启动一个infra container 共享Network Namespace其他容器加入到 Infra container 的 Network Namespace 中。整个 Pod 里面，必然是 Infra container 第一个启动。并且整个 Pod 的生命周期是等同于 Infra container 的生命周期的，与容器A 和 B 是无关的。
+
+- 共享存储
+
+> 两个容器挂载同一个目录  日志收集
+
 ##### 2.2.1.2 Pod控制器
 
 Pod控制器是pod启动的一种模版，用来保证在K8S里启动的Pod应始终按照我们的预期运行（副本数、生命周期、健康状态检查）。
@@ -81,6 +105,79 @@ K8S内提供众多的Pod控制器，
 - StatefulSet（管理有状态应用的）
 - Job
 - CronJob
+
+###### 2.2.1.2.1 Cron Job
+
+> schedule：设置时间格式，它的时间格式和 Linux 的 crontime 是一样的
+>
+> startingDeadlineSeconds：即：每次运行 Job 的时候，它最长可以等多长时间，有时这个 Job 可能运行很长时间也不会启动。所以这时，如果超过较长时间的话，CronJob 就会停止这个 Job；
+>
+> concurrencyPolicy：就是说是否允许并行运行。第二个 Job 要到时间需要去运行的时候，上一个 Job 还没完成。如果这个 policy 设置为 true 的话，那么不管你前面的 Job 是否运行完成，每分钟都会去执行；如果是 false，它就会等上一个 Job 运行完成之后才会运行下一个；
+>
+> JobsHistoryLimit：指定任务历史存留数
+
+1. Job Controller负责根据配置创建Pod
+2. Job Controller跟踪Job状态,根据配置及时重试Pod或者继续创建
+3. Job Controller会自动添加label来跟踪对应的pod,并根据配置并行或者串行创建Pod
+
+###### 2.2.1.2.2 Daement Set
+
+- ## 更新策略
+
+>  **RollingUpdate** 其实比较好理解，就是会一个一个的更新。先更新第一个 pod，然后老的 pod 被移除，通过健康检查之后再去见第二个 pod，这样对于业务上来说会比较平滑地升级，不会中断；
+>
+> **OnDelete** 模板更新之后，pod 不会有任何变化，需要我们手动控制。删除某一个节点对应的 pod，它就会重建，不删除的话它就不会重建
+
+- ## 管理模式
+
+> 1. DaemonSet Controller负责根据配置创建Pod
+> 2. DaemonSet Controller跟踪Job状态，根据配置及时重试Pod或者继续创建
+> 3. DaemonSet Controller会自动添加affinity&label来跟踪对应的pod,并根据配置在每个节点或者适合的部分节点创建Pod
+
+##### 2.2.1.3 容器设计模式
+
+- ### InitContainer
+
+> 首先启动 退出后 启动别的容器 tomcat+war包 (war包cp到emptydir第二个容器挂emptydir) 
+
+- ### Sidecar
+
+> sidecar 通过在Pod里定义专门容器，来执行主业务容器需要的辅助工作
+>
+> - 原本需要在容器里面执行 SSH 需要干的一些事情，可以写脚本、一些前置的条件，其实都可以通过像 Init Container 或者另外像 Sidecar 的方式去解决；
+> - 当然还有一个典型例子就是我的日志收集，日志收集本身是一个进程，是一个小容器，那么就可以把它打包进 Pod 里面去做这个收集工作；
+> - 还有一个非常重要的东西就是 Debug 应用，实际上现在 Debug 整个应用都可以在应用 Pod 里面再次定义一个额外的小的 Container，它可以去 exec 应用 pod 的 namespace；
+> - 查看其他容器的工作状态，这也是它可以做的事情。不再需要去 SSH 登陆到容器里去看，只要把监控组件装到额外的小容器里面就可以了，然后把它作为一个 Sidecar 启动起来，跟主业务容器进行协作，所以同样业务监控也都可以通过 Sidecar 方式来去做。
+>
+> - **优势:** 
+>
+>   辅助功能从业务容器解耦，所以我就能够独立发布 Sidecar 容器，
+>
+>   更重要的是这个能力是可以重用的，即同样的一个监控 Sidecar 或者日志 Sidecar，可以被全公司的人共用
+
+##### 2.2.1.4 Deployment
+
+###### Deployment 中的字段解析
+
+spec 字段：
+
+> **MinReadySeconds**：30    Pod ready 超过 30 秒之后才认为 Pod 是 available 的
+>
+> **revisionHistoryLimit**： 保留历史 revision，即保留历史 ReplicaSet 的数量，默认值为 10 个paused：paused 是标识，**Deployment** 只做数量维持，不做新的发布，这里在 Debug 场景可能会用到；**progressDeadlineSeconds**：当 Deployment 处于扩容或者发布状态时，它会处于一个 processing 的状态，processing 可以设置一个超时时间。如果超过超时时间还处于 processing，那么 controller 将认为这个 Pod 会进入 failed 的状态。
+>
+> 升级策略字段
+>
+> **MaxUnavailable**：滚动过程中最多有多少个 Pod 不可用；默认25% 
+>
+> **MaxSurge**：滚动过程中最多存在多少个 Pod 超过预期 replicas 数量  默认25% 
+>
+> 要注意的是 MaxSurge 和 MaxUnavailable 不能同时为 0
+
+###### 管理模式
+
+> 1. Deployment只负责管理不同版本的ReplicaSet, 由ReplicaSet管理Pod副本数 每个ReplicaSet对应了Deployment template的一个版本 一个ReplicaSet下的Pod都是相同的版本
+> 2. Deployment 管理多版本的方式，是针对每个版本的 template 创建一个 ReplicaSet，由 ReplicaSet 维护一定数量的 Pod 副本，而 Deployment 只需要关心不同版本的 ReplicaSet 里要指定多少数量的 Pod；
+> 3. 因此，Deployment 发布部署的根本原理，就是 Deployment 调整不同版本 ReplicaSet 里的终态副本数，以此来达到多版本 Pod 的升级和回滚。
 
 #### 2.2.2 Name/Namespace
 
@@ -641,4 +738,72 @@ nginx-ds   NodePort   10.99.230.128   <none>        80:31909/TCP   23m
 
 - 陈述式删除：`kubectl delete svc nginx-ds` (推荐)
 - 声明式删除：`kubectl delete -f svc-nginx-ds.yaml`
+
+## 5 Kubernetes 核心插件
+
+### 5.1 CNI网络插件（Flannel）
+
+CNI网络插件最主要的功能就是实现Pod资源能够跨宿主机进行通信
+
+常见CNI网络插件：
+
+- Flannel（市场占有率38%）
+- Calino（市场占有率35%）
+- Canal（市场占有率5%）
+- Contiv(Cisco 开源)
+- OpenContrail
+- NSX-T
+- Kube-router
+
+### 5.2 服务发现插件（CoreDNS）
+
+- 简单来说，服务发现就是服务（应用）之间相互定位的过程。
+- 服务发现并不是云计算时代特有产物，传统的单体结构也会用到。
+  - 服务（应用）的动态性强
+  - 服务（应用）更新发布频繁
+  - 服务（应用）支持自动伸缩
+- 在K8S集群里，Pod的IP是不断变化的，如何“以不变应万变”？
+  - 抽象出service资源，通过标签选择器，关联一组Pod
+  - 抽象出集群网络，通过相对固定的集群IP（ClusterIP），使服务接入固定
+- 那么如何自动关联service name和cluster ip呢？从而服务被集群自动发现的目的呢？
+  - 考虑传统DNS模型：xxxx.host.come --> 10.20.2.1
+  - 能够在K8S集群中建立这样的模型：nginx-ds（service name） --> 192.168.0.2（Cluster IP）
+  - K8S服务发现的方式就是参照DNS
+- K8S集群DNS功能插件：
+  - Kube DNS：Kubernetes v1.2 - Kubernetes v1.10
+  - Core DNS：Kubernetes v1.11 至今
+
+> K8S DNS功能不是万能的，它只是自动维护service name和Cluster IP的关系
+
+### 5.3 服务暴露插件（Traefik）
+
+K8S的DNS实现了服务在集群“内”被自动发现，那如何使得服务在集群“外”被使用和访问呢？
+
+- 使用NodePort类型的service
+  - 注意：只能使用kube-proxy的iptables模型，无法使用kube-proxy的ipvs模型，因此不推荐用此种方法了。
+- 使用Ingress资源
+  - 注意：Ingress资源只能调度并暴露7层应用，这里特指http/https协议
+
+#### 5.3.1 NodePort型Service
+
+暴露为type=nodeport，
+
+`kubectl expose deployment nginx-dp --port=80 --type=NodePort -n app-dev`
+
+#### 5.3.2 Ingress资源
+
+- Ingress是K8S API的标准资源之一，也是核心资源，它其实就是一组基于域名和URL路径，把用户的请求转发至指定的service资源的规则
+- 可以将集群外部的请求流量，转发至集群内部，从而实现服务暴露
+- Ingress控制器可以为Ingress资源监听某套接字，然后根据Ingress规则匹配机制路由调度流量的一个组件
+- Ingress其实就是简化版的nginx（流量调度）+一段go脚本（动态识别yaml）而已
+- 常见的Ingress控制器实现软件：
+  - Ingress-nginx
+  - HAProxy
+  - Traefik（核心）
+
+### 5.4 GUI管理插件（Dashboard）
+
+## 6 Kubernetes的RBAC原理
+
+RBAC：Role Based Access Control
 
