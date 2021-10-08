@@ -103,6 +103,25 @@ LoadBalancer 服务是暴露服务到 internet 的标准方式。在 GKE 上，�
 
 ![Deployment evolution](./images/k8s-loadbalancer-logic-view.png)
 
+LoadBalancer这种类型的Yaml文件示例如下：
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+name: my-loadbalancer-service
+spec:
+selector:
+ app: myapp
+type: LoadBalancer
+ports:
+ - nodePort: 31000
+ port: 80
+ targetPort: 9376
+```
+
+
+
 ### 何时使用这种方式？
 
 如果你想要直接暴露服务，这就是默认方式。所有通往你指定的端口的流量都会被转发到对应的服务。它没有过滤条件，没有路由等。这意味着你几乎可以发送任何种类的流量到该服务，像 HTTP，TCP，UDP，Websocket，gRPC 或其它任意种类。
