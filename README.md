@@ -1,5 +1,5 @@
 # containerization
-> 本学习笔记均为向博客https://blog.stanley.wang/的博客主在B站的视频学习而来！
+> 本学习笔记部分内容为向博客 https://blog.stanley.wang/ 的博客主在B站的视频学习而来！
 
 git branch -M main
 
