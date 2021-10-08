@@ -8,6 +8,28 @@
 - Mesosphere + Marathon
 - Kubernetes（K8S）
 
+### 1.1 什么是云原生？
+
+​	以下定义摘自CNCF组织官网，https://www.cncf.io/about/who-we-are/
+
+> Cloud native technologies empower organizations to build and run scalable applications in modern, dynamic environments such as public, private, and hybrid clouds. Containers, service meshes, microservices, immutable infrastructure, and declarative APIs exemplify this approach.
+>
+> These techniques enable loosely coupled systems that are resilient, manageable, and observable. Combined with robust automation, they allow engineers to make high-impact changes frequently and predictably with minimal toil.
+>
+> The Cloud Native Computing Foundation seeks to drive adoption of this paradigm by fostering and sustaining an ecosystem of open source, vendor-neutral projects. We democratize state-of-the-art patterns to make these innovations accessible for everyone.
+
+由此可知，CNCF在定义中给出了云原生的关键技术：容器、服务网格、微服务、不可变基础设置、和声明式API等，是目前云原生的最佳实践。下图为云原生的基本技术栈：
+
+![Deployment evolution](./images/cloud-native-key-technology.png)
+
+### 1.2 云原生程序的特点
+
+- 程序的配置，通过设置**环境变量**传递到容器内部
+- 程序的配置，通过程序**启动参数**配置生效
+- 程序的配置，通过集中在**配置中心进行统一管理
+
+> 有状态的app一般不往K8S中放
+
 ## 2 Kubernetes 概述
 
 官网：https://kubernetes.io/
@@ -106,7 +128,29 @@ K8S内提供众多的Pod控制器，
 - Job
 - CronJob
 
-###### 2.2.1.2.1 Cron Job
+###### 2.2.1.2.1 Deployment
+
+- 字段解析
+
+> **MinReadySeconds**：30    Pod ready 超过 30 秒之后才认为 Pod 是 available 的
+>
+> **revisionHistoryLimit**： 保留历史 revision，即保留历史 ReplicaSet 的数量，默认值为 10 个paused：paused 是标识，**Deployment** 只做数量维持，不做新的发布，这里在 Debug 场景可能会用到；**progressDeadlineSeconds**：当 Deployment 处于扩容或者发布状态时，它会处于一个 processing 的状态，processing 可以设置一个超时时间。如果超过超时时间还处于 processing，那么 controller 将认为这个 Pod 会进入 failed 的状态。
+>
+> 升级策略字段
+>
+> **MaxUnavailable**：滚动过程中最多有多少个 Pod 不可用；默认25% 
+>
+> **MaxSurge**：滚动过程中最多存在多少个 Pod 超过预期 replicas 数量  默认25% 
+>
+> 要注意的是 MaxSurge 和 MaxUnavailable 不能同时为 0
+
+- ###### 管理模式
+
+> 1. Deployment只负责管理不同版本的ReplicaSet, 由ReplicaSet管理Pod副本数 每个ReplicaSet对应了Deployment template的一个版本 一个ReplicaSet下的Pod都是相同的版本
+> 2. Deployment 管理多版本的方式，是针对每个版本的 template 创建一个 ReplicaSet，由 ReplicaSet 维护一定数量的 Pod 副本，而 Deployment 只需要关心不同版本的 ReplicaSet 里要指定多少数量的 Pod；
+> 3. 因此，Deployment 发布部署的根本原理，就是 Deployment 调整不同版本 ReplicaSet 里的终态副本数，以此来达到多版本 Pod 的升级和回滚。
+
+###### 2.2.1.2.2 Cron Job
 
 > schedule：设置时间格式，它的时间格式和 Linux 的 crontime 是一样的
 >
@@ -120,7 +164,7 @@ K8S内提供众多的Pod控制器，
 2. Job Controller跟踪Job状态,根据配置及时重试Pod或者继续创建
 3. Job Controller会自动添加label来跟踪对应的pod,并根据配置并行或者串行创建Pod
 
-###### 2.2.1.2.2 Daement Set
+###### 2.2.1.2.3 Daement Set
 
 - ## 更新策略
 
@@ -154,30 +198,6 @@ K8S内提供众多的Pod控制器，
 >   辅助功能从业务容器解耦，所以我就能够独立发布 Sidecar 容器，
 >
 >   更重要的是这个能力是可以重用的，即同样的一个监控 Sidecar 或者日志 Sidecar，可以被全公司的人共用
-
-##### 2.2.1.4 Deployment
-
-###### Deployment 中的字段解析
-
-spec 字段：
-
-> **MinReadySeconds**：30    Pod ready 超过 30 秒之后才认为 Pod 是 available 的
->
-> **revisionHistoryLimit**： 保留历史 revision，即保留历史 ReplicaSet 的数量，默认值为 10 个paused：paused 是标识，**Deployment** 只做数量维持，不做新的发布，这里在 Debug 场景可能会用到；**progressDeadlineSeconds**：当 Deployment 处于扩容或者发布状态时，它会处于一个 processing 的状态，processing 可以设置一个超时时间。如果超过超时时间还处于 processing，那么 controller 将认为这个 Pod 会进入 failed 的状态。
->
-> 升级策略字段
->
-> **MaxUnavailable**：滚动过程中最多有多少个 Pod 不可用；默认25% 
->
-> **MaxSurge**：滚动过程中最多存在多少个 Pod 超过预期 replicas 数量  默认25% 
->
-> 要注意的是 MaxSurge 和 MaxUnavailable 不能同时为 0
-
-###### 管理模式
-
-> 1. Deployment只负责管理不同版本的ReplicaSet, 由ReplicaSet管理Pod副本数 每个ReplicaSet对应了Deployment template的一个版本 一个ReplicaSet下的Pod都是相同的版本
-> 2. Deployment 管理多版本的方式，是针对每个版本的 template 创建一个 ReplicaSet，由 ReplicaSet 维护一定数量的 Pod 副本，而 Deployment 只需要关心不同版本的 ReplicaSet 里要指定多少数量的 Pod；
-> 3. 因此，Deployment 发布部署的根本原理，就是 Deployment 调整不同版本 ReplicaSet 里的终态副本数，以此来达到多版本 Pod 的升级和回滚。
 
 #### 2.2.2 Name/Namespace
 
@@ -230,6 +250,149 @@ spec 字段：
 - Ingress则可以调度不同业务域、 不同URL访问路径的业务流量
 
 ## 3 Kubernetes 组件
+
+> A Kubernetes cluster consists of a set of worker machines, called [nodes](https://kubernetes.io/docs/concepts/architecture/nodes/), that run containerized applications. Every cluster has at least one worker node.
+>
+> The worker node(s) host the [Pods](https://kubernetes.io/docs/concepts/workloads/pods/) that are the components of the application workload. The [control plane](https://kubernetes.io/docs/reference/glossary/?all=true#term-control-plane) manages the worker nodes and the Pods in the cluster. In production environments, the control plane usually runs across multiple computers and a cluster usually runs multiple nodes, providing fault-tolerance and high availability.
+>
+> Here's the diagram of a Kubernetes cluster with all the components tied together.
+
+![Deployment evolution](./images/components-of-kubernetes.svg)
+
+### 3.1 Control Plane Components(主控节点/master)
+
+> The control plane's components make global decisions about the cluster (for example, scheduling), as well as detecting and responding to cluster events (for example, starting up a new [pod](https://kubernetes.io/docs/concepts/workloads/pods/) when a deployment's `replicas` field is unsatisfied).
+>
+> Control plane components can be run on any machine in the cluster. However, for simplicity, set up scripts typically start all control plane components on the same machine, and do not run user containers on this machine.
+
+主控节点主要包括以下几个组件：
+
+- etcd：配置存储中心，一般配置为高可用模式，奇数个节点即可。
+- kube-api-server
+- kube-controller-manager
+- kube-scheduler
+
+#### 3.1.1 kube-apiserver
+
+> The API server is a component of the Kubernetes [control plane](https://kubernetes.io/docs/reference/glossary/?all=true#term-control-plane) that exposes the Kubernetes API. The API server is the front end for the Kubernetes control plane.
+>
+> The main implementation of a Kubernetes API server is [kube-apiserver](https://kubernetes.io/docs/reference/generated/kube-apiserver/). kube-apiserver is designed to scale horizontally—that is, it scales by deploying more instances. You can run several instances of kube-apiserver and balance traffic between those instances.
+
+Kube-apiserver 主要提供了以下功能：
+
+- 提供了集群管理的RESTAPI接口(包括鉴权、数据校验及集群状态变更)
+- 负责其他模块之间的数据交互,承担通信枢纽功能
+- 是资源配额控制的入口
+- 提供完备的集群安全机制
+
+#### 3.1.2 etcd
+
+> Consistent and highly-available key value store used as Kubernetes' backing store for all cluster data.
+>
+> If your Kubernetes cluster uses etcd as its backing store, make sure you have a [back up](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#backing-up-an-etcd-cluster) plan for those data.
+
+#### 3.1.3 kube-scheduler
+
+> Control plane component that watches for newly created [Pods](https://kubernetes.io/docs/concepts/workloads/pods/) with no assigned [node](https://kubernetes.io/docs/concepts/architecture/nodes/), and selects a node for them to run on.
+>
+> Factors taken into account for scheduling decisions include: individual and collective resource requirements, hardware/software/policy constraints, affinity and anti-affinity specifications, data locality, inter-workload interference, and deadlines.
+
+Kube-scheduler 主要提供以下功能：
+
+- 主要功能是接收调度pod到适合的运算节点上
+- 预选策略( predict )
+- 优选策略( priorities )
+
+#### 3.1.4 kube-contronller-manager
+
+> Control plane component that runs [controller](https://kubernetes.io/docs/concepts/architecture/controller/) processes.
+>
+> Logically, each [controller](https://kubernetes.io/docs/concepts/architecture/controller/) is a separate process, but to reduce complexity, they are all compiled into a single binary and run in a single process.
+>
+> Some types of these controllers are:
+>
+> - Node controller: Responsible for noticing and responding when nodes go down.
+> - Job controller: Watches for Job objects that represent one-off tasks, then creates Pods to run those tasks to completion.
+> - Endpoints controller: Populates the Endpoints object (that is, joins Services & Pods).
+> - Service Account & Token controllers: Create default accounts and API access tokens for new namespaces.
+
+Kube controller manager 由一系列控制器组成，通过apiserver监控整个集群的状态，并确保集群处于预期的工作状态。
+
+- Node Controller
+- Deployment Controller
+- Service Controller
+- Volume Controller
+- Endpoint Controller
+- Garbage Controller
+- Namespace Controller
+- Job Controller
+- Resource quta Controller
+
+### 3.2 Node Components(运算节点/node)
+
+> Node components run on every node, maintaining running pods and providing the Kubernetes runtime environment.
+
+#### 3.2.1 kubelet 
+
+> An agent that runs on each [node](https://kubernetes.io/docs/concepts/architecture/nodes/) in the cluster. It makes sure that [containers](https://kubernetes.io/docs/concepts/containers/) are running in a [Pod](https://kubernetes.io/docs/concepts/workloads/pods/).
+>
+> The kubelet takes a set of PodSpecs that are provided through various mechanisms and ensures that the containers described in those PodSpecs are running and healthy. The kubelet doesn't manage containers which were not created by Kubernetes.
+
+- 简单地说, kubelet的主要功能就是定时从某个地方获取节点上pod的期望状态(运行什么容器、运行的副本数量、网络或者存储如何配置等等) ,并调用对应的容器平台接口达到这个状态
+- 定时汇报当前节点的状态给apiserver,以供调度的时候使用
+- 镜像和容器的清理工作，保证节点上镜像不会占满磁盘空间，退出的容器不会占用太多资源
+
+#### 3.2.2 kube-proxy
+
+> kube-proxy is a network proxy that runs on each [node](https://kubernetes.io/docs/concepts/architecture/nodes/) in your cluster, implementing part of the Kubernetes [Service](https://kubernetes.io/docs/concepts/services-networking/service/) concept.
+>
+> [kube-proxy](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-proxy/) maintains network rules on nodes. These network rules allow network communication to your Pods from network sessions inside or outside of your cluster.
+>
+> kube-proxy uses the operating system packet filtering layer if there is one and it's available. Otherwise, kube-proxy forwards the traffic itself.
+
+- 是K8S在每个节点上运行网络代理, service资源的载体
+- **建立了pod网络和集群网络的关系**( clusterip >podip )
+- 常用三种流量调度模式
+  - Userspace (废弃)
+  - Iptables (濒临废弃)（绝大部分公司在用）
+  - Ipvs(推荐)
+
+- 负责建立和删除包括更新调度规则、通知apiserver自己的更新,或者从apiserver那里获取其他kube- proxy的调度规则变化来更新自己的
+
+### 3.3 Kubernetes 客户端
+
+- ### kubectl
+
+  Kubernetes 命令行工具，`kubectl`，使得你可以对 Kubernetes 集群运行命令。 你可以使用 `kubectl` 来部署应用、监测和管理集群资源以及查看日志。
+
+### 3.4 Kubernetes 核心插件
+
+#### 3.4.1 CNI网络插件（Flannel/Calico）
+
+k8s设计了网络模型，但却将他的实现交给了网络插件，CNI网络插件最主要的功能就是实现Pod资源能够跨主机进行通信。种类众多，以Flannel为例：
+
+- 三种常用工作模式
+- 优化SNAT规则
+
+#### 3.4.2 服务发现用插件（CoreDNS）
+
+服务发现就是服务（应用）之间相互定位的过程：
+
+- 集群网络：Cluster IP
+- Service资源：Service Name .
+- CoreDNS软件：实现了Service Name和Cluster IP的自动关联
+
+#### 3.4.3 服务暴露用插件（Traefik）
+
+服务暴露就是使k8s的服务能够被外部使用和访问，Ingress资源就是专用于暴露7层应用到K8S集群外的一种核心资源(http/https)。
+
+- Ingress控制器：一个简化版的nginx (调度流量) + go脚本(动态识别yaml)
+
+- Traefik软件：实现了ingress控制器的一个软件
+
+#### 3.4.4 GUI管理插件（Dashboard）
+
+> [Dashboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) is a general purpose, web-based UI for Kubernetes clusters. It allows users to manage and troubleshoot applications running in the cluster, as well as the cluster itself.
 
 ## 4 Kubernetes 核心资源的管理方法
 
@@ -807,3 +970,41 @@ K8S的DNS实现了服务在集群“内”被自动发现，那如何使得服�
 
 RBAC：Role Based Access Control
 
+K8S自1.6版本起，使用基于角色的访问控制（RBAC）
+
+相比于ABAC（基于属性的访问控制）和WebHook等鉴权机制：
+
+- 对集群中的资源的权限实现了完整覆盖
+- 支持权限的动态调整，无需重启apiserver
+
+> 权限：
+>
+> - 读：get
+> - 写：write
+> - 更新：update
+> - 列出：list
+> - 监控：watch
+>
+> 账户：
+>
+> - 用户账户
+> - 服务账户
+>
+> 角色：
+>
+> - Role
+> - ClusterRole
+>
+> 绑定角色：
+>
+> - RoleBinding
+> - ClusterRoleBinding
+
+## 7 Kubernetes配置中心
+
+- XDiamond：全局配置中心，存储应用的配置项，解决配置混乱分散的问题。来源于淘宝的开源项目Diamond
+- Qconf：Qconf是一个分布式配置管理工具，用来替代传统的配置文件，使得配置信息和程序代码分离，同时配置变化能够实时同步到客户端，而且保证用户高效读取到配置数据，极大的简化了配置管理工作。
+- Disconf：专注于各种【分布式系统配置管理】的【通用组件】和【通用平台】，提供统一的配置管理服务。
+- SpringCloudConfig：为分布式的外部配置管理提供服务器和客户端支持
+- K8S ConfigMap：K8S的一种标准资源，专门用于集中管理应用的配置
+- Applo：携程框架部门开源的分布式配置中心
