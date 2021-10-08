@@ -13,7 +13,7 @@ git push -u origin main
 
 [Kubernetes Basics](./Kubernetes.md)
 
-[Kubernetes Install](./KubernetesInstall%20.md)
+[Kubernetes Install](./Kubernetes%20Install.md)
 
 [Kubernetes Install by Binary Mode](./Kubernetes%20Install%20by%20Binary%20Mode.md)
 
