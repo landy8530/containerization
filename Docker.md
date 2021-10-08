@@ -1,22 +1,58 @@
 # Docker 技术入门基础
 
+[TOC]
+
+
+
 ## 1 容器化技术概述
 
-容器，其实是一种特殊的“进程”而已。
+容器，其实是一种特殊的“进程”而已。容器化技术极大地解决了虚拟化技术所造成的开销大的问题。
 
-容器化技术极大地解决了虚拟化技术所造成的开销大的问题。
+一个“容器”，实际上是一个由 Linux Namespace、Linux Cgroups 和 rootfs 三种技术构建出来的进程的隔离环境。
+
+1. **Namespace** 的作用是“隔离”，它让应用进程只能看到该 Namespace 内的“世界”；修改进程视图的主要方法
+2. **Cgroups** 的作用是“限制”，它给这个“世界”围上了一圈看不见的墙。制造约束的主要手段
+3. 一组联合挂载在 /var/lib/docker/aufs/mnt 上的 **rootfs**，这一部分我们称为“容器镜像”（Container Image），是容器的静态视图；一个由 Namespace+Cgroups 构成的隔离环境，这一部分我们称为“容器运行时”（Container Runtime），是容器的动态视图。
 
 ### 1.1 Chroot技术
 
+如果需要在一个宿主机上运行多个容器，且容器之间相互个离，那么第一个就需要系统库文件的依赖，对于一个容器而言，需要将其需要的系统文件单独复制出来一份，放到指定目录，并且需要让进程认为这就是根目录，而不是去调用宿主机系统上的库文件。Chroot就是一个切换根目录的方式。
+
 ### 1.2 Namespace机制
 
+为了让多个容器以沙盒的方式在宿主机上运行，就需要提前定义好各个容器能看到的边界。由于各个容器都是直接运行在宿主机系统上，因此需要内核对各个容器的上下文进行修改，让他们看上去是一个独立的操作系统。比如，指定PID为1的进程，指定网卡设备，指定文件系统挂载，指定用户等等。
+
+> 在Linux操作系统中，当内核初始化完毕之后，会启动一个init进程，这个进程是整个操作系统的第一个用户进程，所以它的进程ID为1，也就是我们常说的PID1进程。在这之后，所有的用户态进程都是该进程的后代进程，由此我们可以看出，整个系统的用户进程，是一棵由init进程作为根的进程树。
+>
+> init进程有一个非常厉害的地方，就是SIGKILL信号对它无效。很显然，如果我们将一棵树的树根砍了，那么这棵树就会分解成很多棵子树，这样的最终结果是导致整个操作系统进程杂乱无章，无法管理。
+
+在容器中看到只有自己一个进程，但是这个进程其实是在宿主机上的，只不过是一个独立的namespace。
+
+Linux操作系统内核从底层实现了为各个进程创建独立用户空间的功能，不同用户空间似于一个个独立的虚拟机系统，用户空间内部进程不能感知到其它用户空间中的进程状态。内核提供了六种Namespaces:
+
+| Type  |                          | Description                                                  | 内核版本 |
+| ----- | ------------------------ | ------------------------------------------------------------ | -------- |
+| UTS   | hostname and domainname  | 主机名和域名隔离，运行内核的名称、版本、底层体系结构类型等信息（UNIX Timesharing System） | 2.6.19   |
+| User  |                          | 用户隔离。运行进程的用户和组                                 | 3.8.x    |
+| Mount |                          | 挂载点隔离。已经装载的文件系统的视图 Mount Namespace，用于让被隔离进程只看到当前 Namespace 里的挂载点信息，主要指根目录 | 2.4.19   |
+| IPC   | Inter-process-connection | 进程间通信隔离。消息队列、共享内容、信号量                   | 2.6.19   |
+| PID   | Process                  | 有关进程ID的信息                                             |          |
+| ID    | PID隔离                  |                                                              | 2.6.24   |
+| Net   | Network                  | 网络隔离：网络相关的命名空间参数 Network Namespace，用于让被隔离进程看到当前 Namespace 里的网络设备和配置（网络设备、协议栈、端口） | 2.6.29   |
+
+在 Linux 内核中，有很多资源和对象是不能被 Namespace 化的，最典型的例子就是：**时间**。
+
 ### 1.3 Cgroup技术
+
+Linux Cgroups 就是 Linux 内核中用来为进程设置资源限制的一个重要功能。Linux Cgroups 的全称是 Linux Control Group。它最主要的作用，就是限制一个进程组能够使用的资源上限，包括 CPU、内存、磁盘、网络带宽等等。此外，Cgroups 还能够对进程进行优先级设置、审计，以及将进程挂起和恢复等操作。
+
+一个正在运行的 Docker 容器，其实就是一个启用了多个 Linux Namespace 的应用进程，而这个进程能够使用的资源量，则受 Cgroups 配置的限制。这也是容器技术中一个非常重要的概念，即：容器是一个“单进程”模型。
 
 ## 2 Basic Docker Architucture
 
 ### 2.1 What's Docker
 
-Docker is an open platform for developing, shipping, and running applications. Docker enables you to separate your applications from your infrastructure so you can deliver software quickly. With Docker, you can manage your infrastructure in the same ways you manage your applications. By taking advantage of Docker’s methodologies for shipping, testing, and deploying code quickly, you can significantly reduce the delay between writing code and running it in production.
+> Docker is an open platform for developing, shipping, and running applications. Docker enables you to separate your applications from your infrastructure so you can deliver software quickly. With Docker, you can manage your infrastructure in the same ways you manage your applications. By taking advantage of Docker’s methodologies for shipping, testing, and deploying code quickly, you can significantly reduce the delay between writing code and running it in production.
 
 - Docker是基于容器技术的轻量级的虚拟化技术解决方案
 - Docker是容器引擎，把Linux的cgroup、namespace等容器底层技术进行封装抽象，并为用户提供了创建和管理容器的便捷界面（包括Command Line和API）
@@ -29,14 +65,24 @@ Docker is an open platform for developing, shipping, and running applications. D
   - 硬件的配置
   - 操作系统的版本
   - 运行时环境的异构
+  
 - Docker引擎统一了程序打包方式（Docker镜像）
   - Java程序
   - Python程序
   - ...
+  
 - Docker引擎统一了程序部署方式（Docker容器）
   - Java - jar ... --> docker run ...
   - Python manage.py rumserver ... --> docker run ...
   - ....
+  
+- Docker解决了资源隔离的问题
+
+  - cpu、memory资源隔离与限制
+  - 访问设备隔离与限制
+
+  - 网络隔离与限制
+  - 用户、用户组隔离限制
 
 #### 2.1.2 Docker容器化的缺点
 
@@ -53,21 +99,27 @@ Docker is an open platform for developing, shipping, and running applications. D
 
 <img src="./images/Docker-Architecture.png" alt="docker-containerized-appliction"  />
 
-Docker uses a client-server architecture. The Docker *client* talks to the Docker *daemon*, which does the heavy lifting of building, running, and distributing your Docker containers. The Docker client and daemon *can* run on the same system, or you can connect a Docker client to a remote Docker daemon. The Docker client and daemon communicate using a REST API, over UNIX sockets or a network interface. Another Docker client is Docker Compose, that lets you work with applications consisting of a set of containers.
+> Docker uses a client-server architecture. The Docker *client* talks to the Docker *daemon*, which does the heavy lifting of building, running, and distributing your Docker containers. The Docker client and daemon *can* run on the same system, or you can connect a Docker client to a remote Docker daemon. The Docker client and daemon communicate using a REST API, over UNIX sockets or a network interface. Another Docker client is Docker Compose, that lets you work with applications consisting of a set of containers.
 
 #### 2.2.1 The Docker daemon
 
-The Docker daemon (`dockerd`) listens for Docker API requests and manages Docker objects such as images, containers, networks, and volumes. A daemon can also communicate with other daemons to manage Docker services.
+> The Docker daemon (`dockerd`) listens for Docker API requests and manages Docker objects such as images, containers, networks, and volumes. A daemon can also communicate with other daemons to manage Docker services.
+
+Docker daemon是指运行在Docker主机（Docker Host）上的Docker后台进程。
 
 #### 2.2.2 The Docker client
 
-The Docker client (`docker`) is the primary way that many Docker users interact with Docker. When you use commands such as `docker run`, the client sends these commands to `dockerd`, which carries them out. The `docker` command uses the Docker API. The Docker client can communicate with more than one daemon.
+> The Docker client (`docker`) is the primary way that many Docker users interact with Docker. When you use commands such as `docker run`, the client sends these commands to `dockerd`, which carries them out. The `docker` command uses the Docker API. The Docker client can communicate with more than one daemon.
+
+Docker client是操作Docker主机的客户端（命令行或者UI）。
 
 #### 2.2.3 Docker registries
 
-A Docker *registry* stores Docker images. Docker Hub is a public registry that anyone can use, and Docker is configured to look for images on Docker Hub by default. You can even run your own private registry.
+> A Docker *registry* stores Docker images. Docker Hub is a public registry that anyone can use, and Docker is configured to look for images on Docker Hub by default. You can even run your own private registry.
+>
+> When you use the `docker pull` or `docker run` commands, the required images are pulled from your configured registry. When you use the `docker push` command, your image is pushed to your configured registry.
 
-When you use the `docker pull` or `docker run` commands, the required images are pulled from your configured registry. When you use the `docker push` command, your image is pushed to your configured registry.
+Docker的镜像仓库。
 
 #### 2.2.4 Docker objects
 
@@ -75,17 +127,21 @@ When you use Docker, you are creating and using images, containers, networks, vo
 
 ##### 2.2.4.1 Images
 
-An *image* is a read-only template with instructions for creating a Docker container. Often, an image is *based on* another image, with some additional customization. For example, you may build an image which is based on the `ubuntu` image, but installs the Apache web server and your application, as well as the configuration details needed to make your application run.
+> An *image* is a read-only template with instructions for creating a Docker container. Often, an image is *based on* another image, with some additional customization. For example, you may build an image which is based on the `ubuntu` image, but installs the Apache web server and your application, as well as the configuration details needed to make your application run.
+>
+> You might create your own images or you might only use those created by others and published in a registry. To build your own image, you create a *Dockerfile* with a simple syntax for defining the steps needed to create the image and run it. Each instruction in a Dockerfile creates a layer in the image. When you change the Dockerfile and rebuild the image, only those layers which have changed are rebuilt. This is part of what makes images so lightweight, small, and fast, when compared to other virtualization technologies.
 
-You might create your own images or you might only use those created by others and published in a registry. To build your own image, you create a *Dockerfile* with a simple syntax for defining the steps needed to create the image and run it. Each instruction in a Dockerfile creates a layer in the image. When you change the Dockerfile and rebuild the image, only those layers which have changed are rebuilt. This is part of what makes images so lightweight, small, and fast, when compared to other virtualization technologies.
+Docker镜像，带环境打包好的程序，可以直接启动运行。
 
 ##### 2.2.4.2 Containers
 
-A container is a runnable instance of an image. You can create, start, stop, move, or delete a container using the Docker API or CLI. You can connect a container to one or more networks, attach storage to it, or even create a new image based on its current state.
+> A container is a runnable instance of an image. You can create, start, stop, move, or delete a container using the Docker API or CLI. You can connect a container to one or more networks, attach storage to it, or even create a new image based on its current state.
+>
+> By default, a container is relatively well isolated from other containers and its host machine. You can control how isolated a container’s network, storage, or other underlying subsystems are from other containers or from the host machine.
+>
+> A container is defined by its image as well as any configuration options you provide to it when you create or start it. When a container is removed, any changes to its state that are not stored in persistent storage disappear.
 
-By default, a container is relatively well isolated from other containers and its host machine. You can control how isolated a container’s network, storage, or other underlying subsystems are from other containers or from the host machine.
-
-A container is defined by its image as well as any configuration options you provide to it when you create or start it. When a container is removed, any changes to its state that are not stored in persistent storage disappear.
+Docker容器，由镜像启动起来正在运行中的程序。
 
 #### 2.2.5 Docker Startup Steps
 
@@ -362,5 +418,24 @@ CONTAINER ID   IMAGE                             COMMAND                  CREATE
 
 ```
 for i in `docker ps -a | grep -i exit|sed '1d'|awk 'print $1'` ; do docker rm -f $i; done
+```
+
+### 4.6 查看Docker容器在宿主机的PID
+
+#### 4.6.1 docker container top
+
+```
+➜  tools docker container top ad910150b7b6
+UID                 PID                 PPID                C                   STIME               TTY                 TIME                CMD
+root                6592                6572                0                   Oct06               ?                   00:00:00            nginx: master process nginx -g daemon off;
+uuidd               6631                6592                0                   Oct06               ?                   00:00:00            nginx: worker process
+....
+```
+
+#### 4.6.2 docker container inspect
+
+```
+➜  tools docker inspect -f '{{.State.Pid}}' ad910150b7b6
+6592
 ```
 

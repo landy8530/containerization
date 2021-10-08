@@ -23,7 +23,7 @@ git push -u origin main
 
 [Cloud Computing Overview](./Cloud-Computing-Overview.md)
 
-
+[Kubernetes Gets External Traffic into Cluster](./Kubernetes-External-Traffic-Method.md)
 
 
 
