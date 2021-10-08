@@ -13,15 +13,15 @@ git push -u origin main
 
 [Kubernetes Basics](./Kubernetes.md)
 
-[Kubernetes Install](./Kubernetes%20Install.md)
+[Kubernetes Install](./Kubernetes-Intall.md)
 
-[Kubernetes Install by Binary Mode](./Kubernetes%20Install%20by%20Binary%20Mode.md)
+[Kubernetes Install by Binary Mode](./Kubernetes-Intall-by-Binary-Mode.md)
 
-[DNS Record Type](./DNS%20Record%20Type.md)
+[DNS Record Type](./DNS-Record-Type.md)
 
-[Container Cloud Monitoring System](./Container%20Cloud%20Monitoring%20System.md)
+[Container Cloud Monitoring System](./Container-Cloud-Monitoring-System.md)
 
-[Cloud Computing Overview](./Cloud%20Computing%20Overview.md)
+[Cloud Computing Overview](./Cloud-Computing-Overview.md)
 
 
 
