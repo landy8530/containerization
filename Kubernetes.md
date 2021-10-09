@@ -44,11 +44,17 @@ Github：https://github.com/kubernetes/kubernetes
 
 ### 2.1 What's Kubernetes
 
-This page is an overview of Kubernetes.
+> Kubernetes is a portable, extensible, open-source platform for managing containerized workloads and services, that facilitates both declarative configuration and automation. It has a large, rapidly growing ecosystem. Kubernetes services, support, and tools are widely available.
+>
+> The name Kubernetes originates from Greek, meaning helmsman or pilot. K8s as an abbreviation results from counting the eight letters between the "K" and the "s". Google open-sourced the Kubernetes project in 2014. Kubernetes combines [over 15 years of Google's experience](https://kubernetes.io/blog/2015/04/borg-predecessor-to-kubernetes/) running production workloads at scale with best-of-breed ideas and practices from the community.
 
-Kubernetes is a portable, extensible, open-source platform for managing containerized workloads and services, that facilitates both declarative configuration and automation. It has a large, rapidly growing ecosystem. Kubernetes services, support, and tools are widely available.
-
-The name Kubernetes originates from Greek, meaning helmsman or pilot. K8s as an abbreviation results from counting the eight letters between the "K" and the "s". Google open-sourced the Kubernetes project in 2014. Kubernetes combines [over 15 years of Google's experience](https://kubernetes.io/blog/2015/04/borg-predecessor-to-kubernetes/) running production workloads at scale with best-of-breed ideas and practices from the community.
+- 简而言之，Kubernetes 是用来管理容器集群的，Master 作为管理者，包括 APIServer，Scheduler，Controller Manager。
+- Node作为副本部署的载体，包含多个 Pod，每个 Pod 又包含多个容器（container）。用户通过 kubectl 给 Master 中的 APIServer 下部署命令。
+- 命令主体是以“.yaml”结尾的配置文件，包含副本的类型，副本个数，名称，端口，模版等信息。
+- APIServer 接受到请求以后，会分别进行以下操作：权限验证（包括特殊控制），取出需要创建的资源，保存副本信息到etcd。
+- APIServer 和 Controller Manager，Scheduler 以及 kubelete 之间通过 List-Watch 方式通信（事件发送与监听）。
+- Controller Manager 通过 etcd 获取需要创建资源的副本数，交由 Scheduler 进行策略分析。
+- 最后 kubelet 负责最终的 Pod 创建和容器加载。部署好容器以后，通过 Service 进行访问，通过 cAdvisor 监控资源。
 
 #### 2.1.1 Going back in time
 

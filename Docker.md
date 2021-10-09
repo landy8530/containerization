@@ -95,6 +95,16 @@ Linux Cgroups 就是 Linux 内核中用来为进程设置资源限制的一个�
 - 没有图形化运维管理工具
 - ...
 
+#### 2.1.3 容器的生命周期
+
+- 检查本地是否存在镜像，如果不存在即从远端仓库检索
+- 利用镜像启动容器
+- 分配一个文件系统，并在只读的镜像层外挂载一个可读写层
+- 从宿主机配置的网桥接口中桥接一个虚拟接口到容器
+- 从地址池配置一个ip地址给容器
+- 执行用户指定的指令
+- 执行完毕后容器终止
+
 ### 2.2 Docker Architecture
 
 <img src="./images/Docker-Architecture.png" alt="docker-containerized-appliction"  />
@@ -285,7 +295,9 @@ Error response from daemon: conflict: unable to delete 965ea09ff2eb (must be for
 
 ## 4 Docker Container Operation
 
-### 4.1 查看所有的容器
+### 4.1 容器基本操作
+
+#### 4.1.1 查看所有的容器
 
 ```
 ➜  Containerization docker ps -a
@@ -298,7 +310,7 @@ b26f4c3ebc08   centos:latest                     "/bin/bash"              11 day
 6b00d8d0edc8   docker101tutorial                 "/docker-entrypoint.…"   6 months ago        Exited (255) 5 months ago      0.0.0.0:81->80/tcp                          docker-tutorial
 ```
 
-### 4.2 启动容器
+#### 4.1.2 启动容器
 
 > docker run是日常用的最频繁用的命令之一，同样也是较为复杂的命令之一
 > 命令格式: docker run [OPTIONS] IMAGE [COMMAND] [ARG...]
@@ -320,7 +332,7 @@ b26f4c3ebc08   centos:latest                     "/bin/bash"              11 day
 > ARG
 > :参数
 
-#### 4.2.1 交互式启动容器
+##### 4.1.2.1 交互式启动容器
 
 ```
 ➜  Containerization docker run -it landy8530/alpine:latest
@@ -350,7 +362,7 @@ ff02::2	ip6-allrouters
 
 交互式退出容器后，因为init为1的进程没有夯住，执行完就会退出了。
 
-#### 4.2.2 非交互式启动容器
+##### 4.1.2.2 非交互式启动容器
 
 ```
 ➜  registry docker run -d --name myalpine_sleep landy8530/alpine:latest /bin/sleep 300
@@ -364,7 +376,7 @@ CONTAINER ID   IMAGE                             COMMAND                  CREATE
 
 在宿主机也能查到进程
 
-### 4.3 进入容器
+#### 4.1.3 进入容器
 
 ```
 ➜  registry docker exec -it 27ea42285394 /bin/sh
@@ -376,9 +388,9 @@ PID   USER     TIME  COMMAND
 / #
 ```
 
-### 4.4 容器的启动/停止/重启
+#### 4.1.4 容器的启动/停止/重启
 
-#### 4.4.1 容器的启动
+##### 4.1.4.1 容器的启动
 
 ```
 ➜  registry docker ps -a
@@ -389,7 +401,7 @@ CONTAINER ID   IMAGE                             COMMAND                  CREATE
 ➜  registry
 ```
 
-#### 4.4.2 容器的停止
+##### 4.1.4.2 容器的停止
 
 ```
 ➜  registry docker stop 27ea42285394
@@ -397,14 +409,14 @@ CONTAINER ID   IMAGE                             COMMAND                  CREATE
 ➜  registry
 ```
 
-#### 4.4.3 容器的重启
+##### 4.1.4.3 容器的重启
 
 ```
 ➜  registry docker restart 27ea42285394
 27ea42285394
 ```
 
-### 4.5 删除容器
+#### 4.1.5 删除容器
 
 ```
 ➜  registry docker rm 394d9da885b7
@@ -414,15 +426,15 @@ CONTAINER ID   IMAGE                             COMMAND                  CREATE
 ➜  registry
 ```
 
-#### 4.5.1 删除已经退出的容器
+##### 4.1.5.1 删除已经退出的容器
 
 ```
-for i in `docker ps -a | grep -i exit|sed '1d'|awk 'print $1'` ; do docker rm -f $i; done
+for i in `docker ps -a | grep -i exit|awk 'print $1'` ; do docker rm -f $i; done
 ```
 
-### 4.6 查看Docker容器在宿主机的PID
+#### 4.1.6 查看Docker容器在宿主机的PID
 
-#### 4.6.1 docker container top
+##### 4.1.6.1 docker container top
 
 ```
 ➜  tools docker container top ad910150b7b6
@@ -432,10 +444,422 @@ uuidd               6631                6592                0                   
 ....
 ```
 
-#### 4.6.2 docker container inspect
+##### 4.1.6.2 docker container inspect
 
 ```
 ➜  tools docker inspect -f '{{.State.Pid}}' ad910150b7b6
 6592
 ```
+
+#### 4.1.7 修改/提交容器
+
+容器提交为image后，就可以把容器的可写内容固化到Image中。
+
+```
+➜  ~ docker commit -p myalpine myalpine:v3.14.2_with_1.txt
+sha256:318b0e24b5944c9a65071cdab8ab830210ff8ef1e40180386ef4a47cd2da1577
+➜  ~ docker images
+REPOSITORY                              TAG                                                     IMAGE ID       CREATED         SIZE
+myalpine                                v3.14.2_with_1.txt                                      318b0e24b594   9 seconds ago   5.6MB
+```
+
+重新进入新创建的image，可以看到提交容器前的内容
+
+```
+➜  ~ docker run -it myalpine:v3.14.2_with_1.txt /bin/sh
+/ # ls
+1.txt  bin    dev    etc    home   lib    media  mnt    opt    proc   root   run    sbin   srv    sys    tmp    usr    var
+/ # cat 1.txt
+helloworld
+```
+
+#### 4.1.8 导入/导出容器
+
+导出容器：
+
+```
+➜  ~ docker save 318b0e24b594 > apline_v3.14.2_with_1.txt.tar
+```
+
+导入容器：
+
+```
+➜  ~ docker load < apline_v3.14.2_with_1.txt.tar
+Loaded image ID: sha256:318b0e24b5944c9a65071cdab8ab830210ff8ef1e40180386ef4a47cd2da1577
+```
+
+#### 4.1.9 查看日志
+
+```
+docker log -f xxxx
+```
+
+### 4.2 容器高级操作
+
+#### 4.2.1 映射端口
+
+- docker run -p 容器外端口:容器内端口
+
+```
+➜  ~ docker run --rm --name mynginx -d -p88:80 landy8530/nginx:latest
+02dbbe22f0997266f88b2acff13b5a623b172bcb985585ecf1e9b57c90c25a00
+➜  ~ docker ps -a
+CONTAINER ID   IMAGE                                COMMAND                  CREATED          STATUS                      PORTS                               NAMES
+02dbbe22f099   landy8530/nginx:latest               "/docker-entrypoint.…"   7 seconds ago    Up 6 seconds                0.0.0.0:88->80/tcp, :::88->80/tcp   mynginx
+```
+
+然后就可以查看宿主机的端口占用情况
+
+```
+➜  ~ lsof -i tcp:88
+COMMAND    PID   USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+com.docke 4733 landyl   62u  IPv6 0xd2698398b2fa6553      0t0  TCP *:kerberos (LISTEN)
+```
+
+使用`curl 127.0.0.1:88`命令也可以访问到容器内nginx的内容
+
+```
+➜  ~ curl 127.0.0.1:88
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+➜  ~
+```
+
+<img src="./images/docker-config-external-port.png" alt="docker-images-mangement" style="zoom: 60%;" />
+
+#### 4.2.2 挂载数据卷
+
+- docker run -v 容器外目录:容器内目录
+
+```
+➜  html docker run -d --rm --name mynginx_with_baidu -p89:80 -v/Users/landyl/Containerization/docker/data_volume/html:/usr/share/nginx/html landy8530/nginx:latest
+62212bfefaf3275ebf09dae9e21c7fdb305e6e9ef5d61afd4e00bfd11ca9690f
+➜  html docker ps -a
+CONTAINER ID   IMAGE                    COMMAND                  CREATED          STATUS          PORTS                               NAMES
+62212bfefaf3   landy8530/nginx:latest   "/docker-entrypoint.…"   4 seconds ago    Up 4 seconds    0.0.0.0:89->80/tcp, :::89->80/tcp   mynginx_with_baidu
+```
+
+以上命令就把宿主机的目录/Users/landyl/Containerization/docker/data_volume/html挂载到了容器中的目录
+
+进入容器也能够看到我们挂载目录下的文件：
+
+```
+➜  html docker exec -it 62212bfefaf3 bash
+root@62212bfefaf3:/# cd /usr/share/nginx/html
+root@62212bfefaf3:/usr/share/nginx/html# ll
+bash: ll: command not found
+root@62212bfefaf3:/usr/share/nginx/html# ls -a
+.  ..  index.html
+root@62212bfefaf3:/usr/share/nginx/html# cat index.html
+<!DOCTYPE html>
+<!--STATUS OK--><html> <head><meta http-equiv=content-type content=text/html;charset=utf-8><meta http-equiv=X-UA-Compatible content=IE=Edge><meta content=always name=referrer><link rel=stylesheet type=text/css href=http://s1.bdstatic.com/r/www/cache/bdorz/baidu.min.css><title>百度一下，你就知道</title></head> <body link=#0000cc> <div id=wrapper> <div id=head> <div class=head_wrapper> <div class=s_form> <div class=s_form_wrapper> <div id=lg> <img hidefocus=true src=//www.baidu.com/img/bd_logo1.png width=270 height=129> </div> <form id=form name=f action=//www.baidu.com/s class=fm> <input type=hidden name=bdorz_come value=1> <input type=hidden name=ie value=utf-8> <input type=hidden name=f value=8> <input type=hidden name=rsv_bp value=1> <input type=hidden name=rsv_idx value=1> <input type=hidden name=tn value=baidu><span class="bg s_ipt_wr"><input id=kw name=wd class=s_ipt value maxlength=255 autocomplete=off autofocus></span><span class="bg s_btn_wr"><input type=submit id=su value=百度一下 class="bg s_btn"></span> </form> </div> </div> <div id=u1> <a href=http://news.baidu.com name=tj_trnews class=mnav>新闻</a> <a href=http://www.hao123.com name=tj_trhao123 class=mnav>hao123</a> <a href=http://map.baidu.com name=tj_trmap class=mnav>地图</a> <a href=http://v.baidu.com name=tj_trvideo class=mnav>视频</a> <a href=http://tieba.baidu.com name=tj_trtieba class=mnav>贴吧</a> <noscript> <a href=http://www.baidu.com/bdorz/login.gif?login&amp;tpl=mn&amp;u=http%3A%2F%2Fwww.baidu.com%2f%3fbdorz_come%3d1 name=tj_login class=lb>登录</a> </noscript> <script>document.write('<a href="http://www.baidu.com/bdorz/login.gif?login&tpl=mn&u='+ encodeURIComponent(window.location.href+ (window.location.search === "" ? "?" : "&")+ "bdorz_come=1")+ '" name="tj_login" class="lb">登录</a>');</script> <a href=//www.baidu.com/more/ name=tj_briicon class=bri style="display: block;">更多产品</a> </div> </div> </div> <div id=ftCon> <div id=ftConw> <p id=lh> <a href=http://home.baidu.com>关于百度</a> <a href=http://ir.baidu.com>About Baidu</a> </p> <p id=cp>&copy;2017&nbsp;Baidu&nbsp;<a href=http://www.baidu.com/duty/>使用百度前必读</a>&nbsp; <a href=http://jianyi.baidu.com/ class=cp-feedback>意见反馈</a>&nbsp;京ICP证030173号&nbsp; <img src=//www.baidu.com/img/gs.gif> </p> </div> </div> </div> </body> </html>
+root@62212bfefaf3:/usr/share/nginx/html#
+```
+
+直接访问宿主机也可以访问到文件index.html的内容
+
+<img src="./images/docker-mount-volume.png" alt="docker-images-mangement" style="zoom: 60%;" />
+
+#### 4.2.3 传递环境变量
+
+- docker run -e 环境变量key:环境变量value
+
+```
+➜  html docker run --rm --name mynginx_with_e -e E_OPTS=landy landy8530/nginx:latest printenv
+HOSTNAME=10636e9b2fa2
+HOME=/root
+PKG_RELEASE=1~buster
+NGINX_VERSION=1.21.3
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+NJS_VERSION=0.6.2
+PWD=/
+E_OPTS=landy
+```
+
+
+
+#### 4.2.4 容器内安装工具
+
+- yum/apt-get/apt等
+
+  `apt-get update && apt-get install curl -y`
+
+```
+➜  html docker run -d -it --name mynginx_with_curl landy8530/nginx:latest bash
+fb4257a8969ccc76abac07b4bee529e8d2cad20f3c6679b75c297e4afad88ab2
+➜  html docker ps
+CONTAINER ID   IMAGE                    COMMAND                  CREATED          STATUS          PORTS                               NAMES
+fb4257a8969c   landy8530/nginx:latest   "/docker-entrypoint.…"   3 seconds ago    Up 2 seconds    80/tcp                              mynginx_with_curl
+root@fb4257a8969c:/# apt-get update && apt-get install yum -y
+➜  html docker exec -it fb4257a8969c bash
+root@fb4257a8969c:/# curl www.baidu.com
+<!DOCTYPE html>
+....
+```
+
+安装完成后还可以推送到远程仓库
+
+```
+➜  html docker commit -p 6ebb6d193e9b landy8530/nginx:v1.21.3_with_curl_yum
+sha256:c9893927bdf66663f59ca3ac9df625cbda779dc8750431afe7503f64346dc993
+➜  html docker push landy8530/nginx:v1.21.3_with_curl_yum
+```
+
+## 5 Dockerfile概述
+
+https://docs.docker.com/engine/reference/builder/
+
+制作docker镜像的方法：
+
+- docker commit
+- Dockerfile
+
+### 5.1 Dockerfile基本概念
+
+> Docker can build images automatically by reading the instructions from a `Dockerfile`. A `Dockerfile` is a text document that contains all the commands a user could call on the command line to assemble an image. Using `docker build` users can create an automated build that executes several command-line instructions in succession.
+
+Dockerfile构建镜像基本概念：
+
+- Dockerfile是通过指令来编排和构建的
+- Dockerfile是一个文本文件组成的
+- 需要使用docker build命令
+
+<img src="./images/dockerfile.png" alt="docker-images-mangement" style="zoom: 100%;" />
+
+> Dockerfile 是一个文本文件，其内包含了一条条的 **指令(Instruction)**，每一条指令构建一层，因此每一条指令的内容，就是描述该层应当如何构建。
+
+### 5.2 Dockerfile规则
+
+- 格式：
+  - #为注释
+  - 指令为大写，内容为小写
+  - 尽管指令是大小写不敏感的，但是强烈建议指令用大写，内容用小写
+- Docker是按顺序执行Dockerfile里的指令集合的（从上到下一次执行）
+- 每个Dockerfile的第一个非注释行指令，必须是“FROM”指令，用于镜像文件构建过程中，指定基准镜像，后续的指令运行于此基准镜像所提供的运行环境中
+  - 实践中，基准镜像一般是任何可用的镜像文件，默认情况下，docker build会在docker 主机上查找，如果不存在，则去远端docker hub上拉取所需的镜像文件
+- 由于dockerfile中每一个指令都会建立一层，每一个 `RUN` 的行为，会新建立一层，在其上执行这些命令，执行结束后，`commit` 这一层的修改，构成新的镜像。镜像是多层存储，每一层的东西并不会在下一层被删除，会一直跟随着镜像。因此镜像构建时，一定要确保每一层只添加真正需要添加的东西，任何无关的东西都应该清理掉。(安装包、缓存等)
+- Dockerfile 支持 Shell 类的行尾添加 `\` 的命令换行方式，以及行首 `#` 进行注释的格式。良好的格式，比如换行、缩进、注释等，会让维护、排障更为容易，这是一个比较好的习惯。
+
+#### 5.2.1 构建镜像中的上下文路径
+
+`docker build` 命令最后有一个 `.`。`.` 表示当前目录，但是这里的当前目录指的并非是dockerfile所在的路径`docker build -t nginx:v3 .` 中的这个 `.`，实际上是在指定上下文的目录，`docker build` 命令会将该目录下的内容打包交给 Docker 引擎以帮助构建镜像。
+
+一般来说，应该会将 `Dockerfile` 置于一个空目录下，或者项目根目录下。如果该目录下没有所需文件，那么应该把所需文件复制一份过来。如果目录下有些东西确实不希望构建时传给 Docker 引擎，那么可以用 `.gitignore` 一样的语法写一个 `.dockerignore`，该文件是用于剔除不需要作为上下文传递给 Docker 引擎的。
+
+### 5.3 Dockerfile核心指令
+
+#### 5.3.1 USER/WORKDIR指令
+
+步骤：
+
+- 创建dockerfile文件
+
+```
+FROM docker.io/landy8530/nginx:latest
+USER nginx
+WORKDIR /usr/share/nginx/html
+```
+
+- docker build
+
+```
+➜  dockerfile docker build . -t docker.io/landy8530/nginx:v1.21.3_with_user_workdir
+```
+
+- 验证
+
+```
+➜  dockerfile docker run -it --rm --name nginx123 4bd16e7a40ea bash
+nginx@23de2e72c740:/usr/share/nginx/html$ pwd
+/usr/share/nginx/html
+nginx@23de2e72c740:/usr/share/nginx/html$ whoami
+nginx
+nginx@23de2e72c740:/usr/share/nginx/html$
+```
+
+#### 5.3.2 ADD/EXPOSE指令
+
+EXPOSE指令只有跟docker run -P结合使用才有实际意义。
+
+步骤：
+
+- 创建dockerfile如下：
+
+```dockerfile
+FROM docker.io/landy8530/nginx:latest
+ADD index.html /usr/share/nginx/html
+EXPOSE 80
+```
+
+- docker build
+
+```
+➜  dockerfile docker build . -t docker.io/landy8530/nginx:v1.21.3_with_expose
+```
+
+- 验证
+
+```
+➜  dockerfile docker run --rm -d --name nginx345 -P landy8530/nginx:v1.21.3_with_expose
+➜  dockerfile docker ps -a
+CONTAINER ID   IMAGE                                 COMMAND                  CREATED             STATUS                     PORTS                                     NAMES
+7d415dcef70b   landy8530/nginx:v1.21.3_with_expose   "/docker-entrypoint.…"   3 minutes ago       Up 3 minutes               0.0.0.0:55000->80/tcp, :::55000->80/tcp   nginx345
+```
+
+查到该容器对外暴露的随机端口为55000，所以使用curl命令可以得到index.html的内容
+
+```
+➜  dockerfile curl 127.0.0.1:55000
+<!DOCTYPE html>
+<!--STATUS OK--><html> <head><meta http-equiv=content-type content=text/html;charset=utf-8><meta http-equiv=X-UA-Compatible content=IE=Edge><meta content=always name=referrer><link rel=stylesheet type=text/css href=http://s1.bdstatic.com/r/www/cache/bdorz/baidu.min.css><title>百度一下，你就知道</title></head> <body link=#0000cc> <div id=wrapper> <div id=head> <div class=head_wrapper> <div class=s_form> <div class=s_form_wrapper> <div id=lg> <img hidefocus=true src=//www.baidu.com/img/bd_logo1.png width=270 height=129> </div> <form id=form name=f action=//www.baidu.com/s class=fm> <input type=hidden name=bdorz_come value=1> <input type=hidden name=ie value=utf-8> <input type=hidden name=f value=8> <input type=hidden name=rsv_bp value=1> <input type=hidden name=rsv_idx value=1> <input type=hidden name=tn value=baidu><span class="bg s_ipt_wr"><input id=kw name=wd class=s_ipt value maxlength=255 autocomplete=off autofocus></span><span class="bg s_btn_wr"><input type=submit id=su value=百度一下 class="bg s_btn"></span> </form> </div> </div> <div id=u1> <a href=http://news.baidu.com name=tj_trnews class=mnav>新闻</a> <a href=http://www.hao123.com name=tj_trhao123 class=mnav>hao123</a> <a href=http://map.baidu.com name=tj_trmap class=mnav>地图</a> <a href=http://v.baidu.com name=tj_trvideo class=mnav>视频</a> <a href=http://tieba.baidu.com name=tj_trtieba class=mnav>贴吧</a> <noscript> <a href=http://www.baidu.com/bdorz/login.gif?login&amp;tpl=mn&amp;u=http%3A%2F%2Fwww.baidu.com%2f%3fbdorz_come%3d1 name=tj_login class=lb>登录</a> </noscript> <script>document.write('<a href="http://www.baidu.com/bdorz/login.gif?login&tpl=mn&u='+ encodeURIComponent(window.location.href+ (window.location.search === "" ? "?" : "&")+ "bdorz_come=1")+ '" name="tj_login" class="lb">登录</a>');</script> <a href=//www.baidu.com/more/ name=tj_briicon class=bri style="display: block;">更多产品</a> </div> </div> </div> <div id=ftCon> <div id=ftConw> <p id=lh> <a href=http://home.baidu.com>关于百度</a> <a href=http://ir.baidu.com>About Baidu</a> </p> <p id=cp>&copy;2017&nbsp;Baidu&nbsp;<a href=http://www.baidu.com/duty/>使用百度前必读</a>&nbsp; <a href=http://jianyi.baidu.com/ class=cp-feedback>意见反馈</a>&nbsp;京ICP证030173号&nbsp; <img src=//www.baidu.com/img/gs.gif> </p> </div> </div> </div> </body> </html>
+```
+
+#### 5.3.3 RUN/ENV指令
+
+ENV为指定环境变量。
+
+RUN可以在构建镜像的时候，执行一些linux命令。
+
+步骤：
+
+- 构建dockerfile
+
+```dockerfile
+FROM centos:7
+ENV VER 9.11.4
+RUN yum install bind-$VER -y
+```
+
+- docker build
+
+```
+➜  dockerfile docker build . -t docker.io/landy8530/centos7_bind
+```
+
+- 验证
+
+```
+➜  dockerfile docker images
+REPOSITORY                              TAG                                                     IMAGE ID       CREATED          SIZE
+landy8530/centos7_bind                  latest                                                  68aa5a1e38bf   15 seconds ago   367MB
+```
+
+进入docker容器
+
+```
+➜  dockerfile docker run -it --rm --name centos-bind 68aa5a1e38bf bash
+[root@46940d843a3e /]# cat /etc/redhat-release
+CentOS Linux release 7.9.2009 (Core)
+
+[root@46940d843a3e /]# rpm -qa bind
+bind-9.11.4-26.P2.el7_9.7.x86_64
+```
+
+
+
+#### 5.3.4 CMD/ENTRYPOINT指令
+
+启动容器需要执行命令用CMD或者ENTRYPOINT指令，默认情况下，如果没有指定CMD指令，则是使用默认的ENTRYPOINT指令。
+
+步骤：
+
+- 构建dockerfille文件
+
+```dockerfile
+FROM centos:7
+RUN yum install httpd -y
+CMD ["httpd", "-D", "FOREGROUND"]
+```
+
+- docker build
+
+```
+➜  dockerfile docker build . -t docker.io/landy8530/centos7_httpd
+```
+
+- 验证
+
+```
+➜  dockerfile docker images
+REPOSITORY                              TAG                                                     IMAGE ID       CREATED          SIZE
+landy8530/centos7_httpd                 latest                                                  a4d3dd2fd2b5   9 seconds ago    375MB
+```
+
+进入容器
+
+```
+➜  dockerfile docker run -d --rm --name myhttpd -p90:80 landy8530/centos7_httpd:latest
+0839c33ee928a5481846c87bb750a5252dc4d46778ba0baa99cc51d6e8de617b
+➜  dockerfile docker ps
+CONTAINER ID   IMAGE                                 COMMAND                  CREATED          STATUS          PORTS                                     NAMES
+0839c33ee928   landy8530/centos7_httpd:latest        "httpd -D FOREGROUND"    3 seconds ago    Up 2 seconds    0.0.0.0:90->80/tcp, :::90->80/tcp         myhttpd
+```
+
+由此可知，httpd对外暴露的端口为90，访问如下：
+
+<img src="./images/dockerfile-centos-httpd-test.png" alt="docker-images-mangement" style="zoom: 100%;" />
+
+### 5.4 Dockerfile综合实验
+
+- dockerfile文件
+
+```dockerfile
+FROM landy8530/nginx:latest
+USER root
+ENV WWW /usr/share/nginx/html
+ENV CONF /etc/nginx/conf.d
+RUN /bin/cp /usr/share/zoninfo/Asia/Shanghai /etc/localtime &&\
+	echo 'Asia/Shanghai' >/etc/timezone
+WORKDIR $WWW
+ADD index.html $WWWW/index.html
+ADD demo.od.com.conf $CONF/demo.od.com.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+- 添加nginx配置文件demo.od.com.conf
+
+```nginx
+server {
+	listen 80;
+	server_name demo.od.com;
+
+	root /usr/share/nginx/html;
+}
+```
+
+- docker build
+
+```
+➜  dockerfile docker build . -t landy8530/nginx:baidu
+```
+
+- docker run
+
+```
+➜  dockerfile docker run --rm -p80:80 landy8530/nginx:baidu
+```
+
+这样之后，只要设置一下hosts，就可以用demo.od.com访问了。
 
