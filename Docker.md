@@ -829,7 +829,7 @@ FROM landy8530/nginx:latest
 USER root
 ENV WWW /usr/share/nginx/html
 ENV CONF /etc/nginx/conf.d
-RUN /bin/cp /usr/share/zoninfo/Asia/Shanghai /etc/localtime &&\
+RUN /bin/cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime &&\
 	echo 'Asia/Shanghai' >/etc/timezone
 WORKDIR $WWW
 ADD index.html $WWWW/index.html
