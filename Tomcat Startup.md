@@ -55,3 +55,18 @@
 ```
 
 > systemctl 是 systemd 的主命令，用于管理系统。
+
+
+# 1. using startup.sh to start the Tomcat in the background
+# the stdout/stderr information will write to CATALINA_OUT file
+# sh $CATALINA_HOME/bin/startup.sh
+
+# 2. using catalina.sh <run> to start the Tomcat in the foreground
+# this command starts the Tomcat in the foreground and displays the running logs in the same console you are currently in.
+# The process is terminated by closing the window/terminal. Also, hitting Ctrl+C will terminate Tomcat.
+# So unless you are in local or dev environments, need to be careful while using catalina command along with run option.
+sh $CATALINA_HOME/bin/catalina.sh run 2>&1 |tee $CATALINA_BASE/logs/castro.log
+
+# using catalina.sh <run> to start the Tomcat in the background
+# catalina.sh <start>: starts the Tomcat in the background. You will have to use the tail command to see the logs as following:
+# tail -f $CATALINA_HOME/logs/catalina.out
